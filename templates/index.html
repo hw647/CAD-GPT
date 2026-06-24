@@ -1,1 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAD-GPT | AutoCAD AI 도우미</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: #F4F7FB; color: #1E293B; min-height: 100vh; }
+  header { background: #1E2761; color: white; padding: 14px 32px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header span { font-size: 13px; color: #CADCFC; margin-left: 4px; }
+  .badge { margin-left: auto; background: #1ABC9C; color: white; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+  .container { max-width: 860px; margin: 40px auto; padding: 0 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .tab { padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; background: white; color: #64748B; box-shadow: 0 1px 4px rgba(0,0,0,0.08); transition: all 0.15s; font-family: inherit; }
+  .tab.active { background: #1E2761; color: white; }
+  .tab:hover:not(.active) { background: #E8EDF8; color: #1E2761; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: white; border-radius: 14px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .quick-btn { padding: 6px 14px; background: #EEF4FF; color: #1E2761; border: 1px solid #C7D9F8; border-radius: 20px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .quick-btn:hover { background: #1E2761; color: white; border-color: #1E2761; }
+  .input-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .input-row input { flex: 1; padding: 12px 16px; border: 1.5px solid #E2E8F0; border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
+  .input-row input:focus { border-color: #4A90D9; }
+  .btn { padding: 12px 22px; background: #4A90D9; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .btn:hover { background: #2D74C4; }
+  .btn:disabled { background: #94A3B8; cursor: not-allowed; }
+  .result { background: #F8FAFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 20px; display: none; white-space: pre-wrap; font-size: 14px; line-height: 1.8; position: relative; }
+  .result.show { display: block; }
+  .result-close { position: absolute; top: 8px; right: 10px; background: #E2E8F0; border: none; font-size: 14px; color: #64748B; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+  .result-close:hover { background: #E74C3C; color: white; }
+  .source-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-bottom: 10px; font-weight: 600; }
+  .source-local { background: #D1FAE5; color: #065F46; }
+  .source-ai { background: #EDE9FE; color: #5B21B6; }
+  .loading { display: flex; align-items: center; gap: 10px; color: #64748B; font-size: 14px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid #E2E8F0; border-top-color: #4A90D9; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CAD-GPT</h1>
+  <span>AutoCAD(오토캐드) AI 도우미</span>
+  <div class="badge">✨ AI 하이브리드</div>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('cmd')">🛠️ 명령어 도우미</button>
+    <button class="tab" onclick="setTab('err')">🚨 오류 해결사</button>
+  </div>
+
+  <div class="panel active" id="panel-cmd">
+    <div class="card">
+      <div class="quick-btns" id="quick-cmd"></div>
+      <div class="input-row">
+        <input type="text" id="cmd-input" placeholder="예: 원을 그리려면 어떻게 해?" onkeydown="if(event.key==='Enter')ask('cmd')" />
+        <button class="btn" id="cmd-btn" onclick="ask('cmd')">질문하기</button>
+      </div>
+      <div class="result" id="cmd-result">
+        <button class="result-close" onclick="closeResult('cmd')">✕</button>
+        <div id="cmd-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-err">
+    <div class="card">
+      <div class="quick-btns" id="quick-err"></div>
+      <div class="input-row">
+        <input type="text" id="err-input" placeholder="오류 메시지를 입력하세요... (어떤 오류든 OK!)" onkeydown="if(event.key==='Enter')ask('err')" />
+        <button class="btn" id="err-btn" onclick="ask('err')">검색</button>
+      </div>
+      <div class="result" id="err-result">
+        <button class="result-close" onclick="closeResult('err')">✕</button>
+        <div id="err-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setTab(t) {
+  document.querySelectorAll('.tab').forEach((b,i) => b.classList.toggle('active', ['cmd','err'][i]===t));
+  document.querySelectorAll('.panel').forEach((p,i) => p.classList.toggle('active', ['panel-cmd','panel-err'][i]==='panel-'+t));
+}
+
+function closeResult(type) {
+  document.getElementById(type+'-result').classList.remove('show');
+}
+
+async function loadQuickBtns(tab) {
+  const res = await fetch(`/db?tab=${tab}`);
+  const data = await res.json();
+  const container = document.getElementById(`quick-${tab}`);
+  container.innerHTML = data.keys.map(k =>
+    `<button class="quick-btn" onclick="setQ('${tab}','${k}')">${k}</button>`
+  ).join('');
+}
+
+function setQ(tab, q) {
+  document.getElementById(tab+'-input').value = q;
+  ask(tab);
+}
+
+async function ask(type) {
+  const input = document.getElementById(type+'-input').value.trim();
+  if(!input) return;
+
+  const resultEl = document.getElementById(type+'-result');
+  const contentEl = document.getElementById(type+'-content');
+  const btn = document.getElementById(type+'-btn');
+
+  resultEl.classList.add('show');
+  contentEl.innerHTML = '<div class="loading"><div class="spinner"></div>답변 생성 중...</div>';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: input, tab: type })
+    });
+    const data = await res.json();
+    const badge = data.source === 'local'
+      ? '<span class="source-badge source-local">⚡ 로컬 DB 즉시 답변</span>'
+      : '<span class="source-badge source-ai">✨ Gemini AI 실시간 답변</span>';
+    contentEl.innerHTML = badge + '<pre style="white-space:pre-wrap;font-family:inherit;">' + data.answer + '</pre>';
+  } catch(e) {
+    contentEl.innerHTML = '<span style="color:#E74C3C;">오류가 발생했어요. 다시 시도해주세요.</span>';
+  }
+  btn.disabled = false;
+}
+
+loadQuickBtns('cmd');
+loadQuickBtns('err');
+</script>
+</body>
+</html>
 
