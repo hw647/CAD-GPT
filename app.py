@@ -57,7 +57,7 @@ def ask():
 
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest",
+            model_name="gemini-2.5-flash-preview-05-20",
             system_instruction=prompts[tab]
         )
         response = model.generate_content(query)
