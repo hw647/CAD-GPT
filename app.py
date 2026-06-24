@@ -1,14 +1,13 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import google.generativeai as genai
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
-# API 키 설정 (Render 환경변수에서 가져옴)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-genai.configure(api_key=GEMINI_API_KEY)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# 로컬 DB
 local_db = {
     "cmd": {
         "원 그리기": "명령어: CIRCLE / 단축키: C\n\n사용법:\n1. C 입력 후 Enter\n2. 중심점 클릭\n3. 반지름 입력 후 Enter\n\n팁: Shift+우클릭으로 중심점 스냅 활용하면 더 정확해요.",
@@ -22,12 +21,12 @@ local_db = {
         "객체 자르기": "명령어: TRIM / 단축키: TR\n\n사용법:\n1. TR 입력 후 Enter 두 번\n2. 자를 부분 클릭\n\n팁: Enter 두 번 누르면 전체 선택 모드로 바로 자르기 가능.",
     },
     "err": {
-        "치수 글자 안보임": "원인: 도면 크기에 비해 치수 문자 크기가 너무 작음\n\n해결:\n1. D 입력 후 Enter (DIMSTYLE)\n2. 수정 클릭\n3. 맞춤 탭 → 전체 축척 사용 값을 키워줍니다.",
+        "치수 글자 안보임": "원인: 도면 크기에 비해 치수 문자 크기가 너무 작음\n\n해결:\n1. D 입력 후 Enter (DIMSTYLE)\n2. 수정 클릭\n3. 맞춤 탭 -> 전체 축척 사용 값을 키워줍니다.",
         "마우스 뚝뚝 끊김": "원인: 스냅(SNAP) 모드가 켜져 있음\n\n해결:\n1. 기능키 F9를 눌러 스냅을 끕니다.\n2. 또는 하단 상태바에서 스냅 버튼 클릭하여 끄기.",
         "마우스 휠 줌 속도": "원인: 휠 확대 비율 설정이 낮음\n\n해결:\n1. ZOOMFACTOR 명령어 입력\n2. 값을 100으로 올립니다. (기본값: 60)",
         "Fatal Error": "원인: 도면 데이터 손상\n\n해결:\n1. RECOVER 명령어로 도면 복구 시도\n2. .sv$ 자동저장 파일을 .dwg로 변경 후 열기\n3. 마지막 저장 버전으로 복구.",
         "Cannot open file": "원인: 파일 경로에 한글/특수문자 또는 파일 손상\n\n해결:\n1. 파일 경로를 영문으로 변경\n2. 다른 버전의 AutoCAD로 열어보기\n3. 백업 파일(.bak)을 .dwg로 변경 후 열기.",
-        "Layer is locked": "원인: 현재 레이어가 잠금 상태\n\n해결:\n1. LA 입력 → 레이어 관리자 열기\n2. 해당 레이어의 자물쇠 아이콘 클릭하여 잠금 해제\n3. 다른 레이어로 전환 후 작업.",
+        "Layer is locked": "원인: 현재 레이어가 잠금 상태\n\n해결:\n1. LA 입력 -> 레이어 관리자 열기\n2. 해당 레이어의 자물쇠 아이콘 클릭하여 잠금 해제\n3. 다른 레이어로 전환 후 작업.",
     }
 }
 
@@ -47,14 +46,15 @@ def ask():
     tab = data.get("tab", "cmd")
 
     if not query:
-        return jsonify({"answer": "질문을 입력해주세요."})
+        return jsonify({"answer": "질문을 입력해주세요.", "source": "error"})
 
-    # 로컬 DB 먼저 확인
     for key, val in local_db[tab].items():
         if query.lower() in key.lower() or key.lower() in query.lower():
             return jsonify({"answer": val, "source": "local"})
 
-    # Gemini AI 호출
+    if not GEMINI_API_KEY:
+        return jsonify({"answer": "API 키가 설정되지 않았어요.", "source": "error"})
+
     try:
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
@@ -71,4 +71,5 @@ def get_db():
     return jsonify({"keys": list(local_db[tab].keys())})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
